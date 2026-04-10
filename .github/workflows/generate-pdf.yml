@@ -1,0 +1,56 @@
+name: Generar PDFs corporativos
+
+on:
+  push:
+    paths:
+      - 'docs/**.md'
+  workflow_dispatch:
+    inputs:
+      all:
+        description: 'Regenerar todos los documentos'
+        type: boolean
+        default: false
+
+jobs:
+  generate-pdf:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repositorio
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+
+      - name: Detectar archivos .md modificados
+        id: changed
+        run: |
+          if [ "${{ github.event.inputs.all }}" = "true" ]; then
+            FILES=$(find docs -name "*.md" | tr '\n' ' ')
+          elif git rev-parse HEAD~1 >/dev/null 2>&1; then
+            FILES=$(git diff --name-only HEAD~1 HEAD -- 'docs/*.md' | tr '\n' ' ')
+          else
+            FILES=$(find docs -name "*.md" | tr '\n' ' ')
+          fi
+          echo "files=$FILES" >> $GITHUB_OUTPUT
+          echo "Archivos a procesar: $FILES"
+
+      - name: Construir imagen Docker
+        run: docker build -t iesra-pdf-gen .
+
+      - name: Generar PDFs
+        run: |
+          mkdir -p output-pdf
+          for f in ${{ steps.changed.outputs.files }}; do
+            echo "Procesando: $f"
+            docker run --rm \
+              -v "${{ github.workspace }}:/app" \
+              iesra-pdf-gen "$f"
+          done
+
+      - name: Commit y push de los PDFs generados
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add output-pdf/
+          git diff --cached --quiet || git commit -m "docs: generar PDFs desde markdown [skip ci]"
+          git push
