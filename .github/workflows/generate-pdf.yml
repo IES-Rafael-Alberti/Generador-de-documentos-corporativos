@@ -29,6 +29,7 @@ jobs:
           elif git rev-parse HEAD~1 >/dev/null 2>&1; then
             FILES=$(git diff --name-only HEAD~1 HEAD -- 'docs/*.md' | tr '\n' ' ')
           else
+            # Primer commit — procesar todos los .md
             FILES=$(find docs -name "*.md" | tr '\n' ' ')
           fi
           echo "files=$FILES" >> $GITHUB_OUTPUT
